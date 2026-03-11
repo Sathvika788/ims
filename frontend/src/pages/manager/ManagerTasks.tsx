@@ -1,135 +1,379 @@
+import { useState } from 'react';
 import PageShell from '../../components/layout/PageShell';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
-import { useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, Trash2, Calendar, AlertCircle } from 'lucide-react';
 
 const ManagerTasks = () => {
   const [showForm, setShowForm] = useState(false);
-  const [internId, setInternId] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [dueDate, setDueDate] = useState('');
+  const [assignedToEmail, setAssignedToEmail] = useState('');
   const [priority, setPriority] = useState('medium');
+  const [dueDate, setDueDate] = useState('');
   const queryClient = useQueryClient();
 
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      await api.post('/tasks/', { intern_id: internId, title, description, due_date: dueDate, priority });
-    },
-    onSuccess: () => {
-      toast.success('Task assigned!');
-      setShowForm(false);
-      setTitle(''); setDescription(''); setDueDate(''); setInternId('');
-      queryClient.invalidateQueries();
+  // Get all interns
+  const { data: interns, isLoading: internsLoading } = useQuery({
+    queryKey: ['interns'],
+    queryFn: async () => {
+      const res = await api.get('/auth/users/interns');
+      return res.data;
     },
   });
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '10px 14px', background: '#f8f9fc',
-    border: '1px solid #e8eaf0', borderRadius: '8px', color: '#0f1623',
-    fontSize: '14px', fontFamily: "'DM Sans', sans-serif", outline: 'none',
-    boxSizing: 'border-box',
-  };
-  const labelStyle: React.CSSProperties = { display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '600', color: '#374151' };
+  // Get all tasks
+  const { data: tasks, isLoading } = useQuery({
+    queryKey: ['all-tasks'],
+    queryFn: async () => {
+      const res = await api.get('/tasks/all');
+      return res.data;
+    },
+  });
 
-  const priorityColors: Record<string, { color: string; bg: string }> = {
-    high: { color: '#dc2626', bg: '#fee2e2' },
-    medium: { color: '#ea580c', bg: '#ffedd5' },
-    low: { color: '#16a34a', bg: '#dcfce7' },
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      await api.post('/tasks/', {
+        assigned_to_email: assignedToEmail,
+        title,
+        description,
+        priority,
+        due_date: dueDate || null,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Task created successfully!');
+      setShowForm(false);
+      setTitle('');
+      setDescription('');
+      setAssignedToEmail('');
+      setPriority('medium');
+      setDueDate('');
+      queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || 'Failed to create task');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      await api.delete(`/tasks/${taskId}`);
+    },
+    onSuccess: () => {
+      toast.success('Task deleted successfully!');
+      queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || 'Failed to delete task');
+    },
+  });
+
+  const priorityColor = (p: string) => {
+    if (p === 'high') return '#ef4444';
+    if (p === 'medium') return '#f97316';
+    return '#22c55e';
+  };
+
+  const statusColor = (s: string) => {
+    if (s === 'completed') return '#22c55e';
+    if (s === 'in_progress') return '#3b82f6';
+    return '#f97316';
+  };
+
+  const handleDelete = (taskId: string, taskTitle: string) => {
+    if (window.confirm(`Are you sure you want to delete task: "${taskTitle}"?`)) {
+      deleteMutation.mutate(taskId);
+    }
   };
 
   return (
-    <PageShell title="Manage Tasks">
-      <div style={{ marginBottom: '24px' }}>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '10px 20px', background: showForm ? '#fee2e2' : '#6366f1',
-            border: 'none', borderRadius: '8px', color: showForm ? '#dc2626' : '#fff',
-            fontWeight: '600', fontSize: '14px', cursor: 'pointer',
-            fontFamily: "'DM Sans', sans-serif",
-          }}
-        >
-          {showForm ? <><X size={16} /> Cancel</> : <><Plus size={16} /> Assign New Task</>}
-        </button>
-      </div>
+    <PageShell title="Task Management">
+      <button
+        onClick={() => setShowForm(!showForm)}
+        style={{
+          padding: '12px 24px',
+          background: '#00d4aa',
+          border: 'none',
+          borderRadius: '8px',
+          color: '#0a0e1a',
+          fontWeight: 'bold',
+          cursor: 'pointer',
+          marginBottom: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}
+      >
+        <Plus size={18} />
+        {showForm ? 'Cancel' : 'Create New Task'}
+      </button>
 
       {showForm && (
-        <div style={{
-          background: '#fff', borderRadius: '12px', border: '1px solid #e8eaf0',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.06)', padding: '28px', marginBottom: '28px',
-        }}>
-          <h3 style={{ margin: '0 0 22px', fontSize: '16px', fontWeight: '700', color: '#0f1623' }}>Assign Task to Intern</h3>
+        <div
+          style={{
+            background: '#111827',
+            padding: '24px',
+            borderRadius: '12px',
+            border: '1px solid #1f2a3c',
+            marginBottom: '24px',
+          }}
+        >
+          <h3 style={{ margin: '0 0 20px 0', color: '#e2e8f0' }}>Create New Task</h3>
+
           <div style={{ display: 'grid', gap: '16px' }}>
             <div>
-              <label style={labelStyle}>Intern ID</label>
-              <input type="text" placeholder="Enter intern user ID" value={internId} onChange={(e) => setInternId(e.target.value)} style={inputStyle} />
-            </div>
-            <div>
-              <label style={labelStyle}>Task Title</label>
-              <input type="text" placeholder="e.g. Build login page" value={title} onChange={(e) => setTitle(e.target.value)} style={inputStyle} />
-            </div>
-            <div>
-              <label style={labelStyle}>Description</label>
-              <textarea placeholder="Describe the task in detail..." value={description} onChange={(e) => setDescription(e.target.value)}
-                style={{ ...inputStyle, minHeight: '100px', resize: 'vertical' }} />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={labelStyle}>Due Date</label>
-                <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={inputStyle} />
-              </div>
-              <div>
-                <label style={labelStyle}>Priority</label>
-                <select value={priority} onChange={(e) => setPriority(e.target.value)} style={inputStyle}>
-                  <option value="low">Low Priority</option>
-                  <option value="medium">Medium Priority</option>
-                  <option value="high">High Priority</option>
+              <label style={{ display: 'block', marginBottom: '8px', color: '#64748b', fontSize: '13px' }}>
+                Assign to Intern (Email) *
+              </label>
+              {internsLoading ? (
+                <p style={{ color: '#64748b', fontSize: '14px' }}>Loading interns...</p>
+              ) : (
+                <select
+                  value={assignedToEmail}
+                  onChange={(e) => setAssignedToEmail(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: '#0d1b2e',
+                    border: '1px solid #1f2a3c',
+                    borderRadius: '8px',
+                    color: '#e2e8f0',
+                    fontSize: '14px',
+                  }}
+                >
+                  <option value="">-- Select Intern --</option>
+                  {interns && interns.length > 0 ? (
+                    interns.map((intern: any) => (
+                      <option key={intern.id} value={intern.email}>
+                        {intern.name} ({intern.email})
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>No interns available</option>
+                  )}
                 </select>
-              </div>
+              )}
             </div>
 
-            {priority && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{
-                  padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700',
-                  background: priorityColors[priority]?.bg, color: priorityColors[priority]?.color,
-                  textTransform: 'uppercase',
-                }}>
-                  {priority} priority
-                </span>
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', color: '#64748b', fontSize: '13px' }}>
+                Task Title *
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Enter task title"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: '#0d1b2e',
+                  border: '1px solid #1f2a3c',
+                  borderRadius: '8px',
+                  color: '#e2e8f0',
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', color: '#64748b', fontSize: '13px' }}>
+                Description *
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Enter task description"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: '#0d1b2e',
+                  border: '1px solid #1f2a3c',
+                  borderRadius: '8px',
+                  color: '#e2e8f0',
+                  minHeight: '100px',
+                  resize: 'vertical',
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: '#64748b', fontSize: '13px' }}>
+                  Priority
+                </label>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: '#0d1b2e',
+                    border: '1px solid #1f2a3c',
+                    borderRadius: '8px',
+                    color: '#e2e8f0',
+                  }}
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
               </div>
-            )}
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: '#64748b', fontSize: '13px' }}>
+                  Due Date (Optional)
+                </label>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: '#0d1b2e',
+                    border: '1px solid #1f2a3c',
+                    borderRadius: '8px',
+                    color: '#e2e8f0',
+                  }}
+                />
+              </div>
+            </div>
 
             <button
               onClick={() => createMutation.mutate()}
-              disabled={!internId || !title || !dueDate || createMutation.isPending}
+              disabled={!title || !description || !assignedToEmail || createMutation.isPending}
               style={{
-                padding: '12px', background: '#6366f1', border: 'none', borderRadius: '8px',
-                color: '#fff', fontWeight: '700', fontSize: '15px',
-                cursor: !internId || !title || !dueDate ? 'not-allowed' : 'pointer',
-                opacity: !internId || !title || !dueDate ? 0.6 : 1,
-                fontFamily: "'DM Sans', sans-serif",
+                padding: '12px',
+                background: '#22c55e',
+                border: 'none',
+                borderRadius: '8px',
+                color: 'white',
+                fontWeight: 'bold',
+                cursor: !title || !description || !assignedToEmail ? 'not-allowed' : 'pointer',
+                opacity: !title || !description || !assignedToEmail ? 0.5 : 1,
               }}
             >
-              {createMutation.isPending ? 'Assigning...' : 'Assign Task'}
+              {createMutation.isPending ? 'Creating...' : 'Create Task'}
             </button>
           </div>
         </div>
       )}
 
-      {!showForm && (
-        <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e8eaf0', padding: '48px', textAlign: 'center' }}>
-          <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-            <Plus size={24} color="#6366f1" />
+      <div
+        style={{
+          background: '#111827',
+          padding: '24px',
+          borderRadius: '12px',
+          border: '1px solid #1f2a3c',
+        }}
+      >
+        <h3 style={{ margin: '0 0 20px 0', color: '#e2e8f0' }}>All Tasks</h3>
+
+        {isLoading ? (
+          <p style={{ color: '#64748b' }}>Loading...</p>
+        ) : tasks && tasks.length > 0 ? (
+          <div style={{ display: 'grid', gap: '16px' }}>
+            {tasks.map((task: any) => (
+              <div
+                key={task.id}
+                style={{
+                  padding: '20px',
+                  background: '#0d1b2e',
+                  borderRadius: '12px',
+                  border: '1px solid #1f2a3c',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{ margin: '0 0 8px 0', color: '#e2e8f0', fontSize: '18px' }}>
+                      {task.title}
+                    </h4>
+                    <p style={{ margin: '0 0 12px 0', color: '#64748b', fontSize: '14px' }}>
+                      {task.description}
+                    </p>
+
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                      <span
+                        style={{
+                          padding: '4px 12px',
+                          background: priorityColor(task.priority) + '22',
+                          color: priorityColor(task.priority),
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        {task.priority}
+                      </span>
+
+                      <span
+                        style={{
+                          padding: '4px 12px',
+                          background: statusColor(task.status) + '22',
+                          color: statusColor(task.status),
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        {task.status.replace('_', ' ')}
+                      </span>
+
+                      {task.due_date && (
+                        <span
+                          style={{
+                            padding: '4px 12px',
+                            background: '#64748b22',
+                            color: '#94a3b8',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <Calendar size={12} />
+                          Due: {task.due_date}
+                        </span>
+                      )}
+                    </div>
+
+                    <p style={{ margin: 0, color: '#64748b', fontSize: '13px' }}>
+                      Assigned to: <strong style={{ color: '#00d4aa' }}>{task.assigned_to_email}</strong>
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => handleDelete(task.id, task.title)}
+                    disabled={deleteMutation.isPending}
+                    style={{
+                      padding: '8px',
+                      background: '#ef444422',
+                      border: '1px solid #ef4444',
+                      borderRadius: '6px',
+                      color: '#ef4444',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
-          <p style={{ margin: '0 0 8px', fontSize: '16px', fontWeight: '600', color: '#0f1623' }}>Assign a task</p>
-          <p style={{ margin: 0, fontSize: '14px', color: '#94a3b8' }}>Click "Assign New Task" to get started</p>
-        </div>
-      )}
+        ) : (
+          <div style={{ textAlign: 'center', padding: '40px' }}>
+            <AlertCircle size={48} color="#64748b" style={{ marginBottom: '16px' }} />
+            <p style={{ color: '#64748b', fontSize: '16px', margin: 0 }}>
+              No tasks created yet
+            </p>
+          </div>
+        )}
+      </div>
     </PageShell>
   );
 };

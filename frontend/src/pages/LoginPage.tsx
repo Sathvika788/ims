@@ -1,19 +1,42 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { useTheme, getThemeColors } from '../context/ThemeContext';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { Mail, Lock, ArrowRight } from 'lucide-react';
+import Logo from '../components/common/Logo';
+import { Button, Input } from '../components/common';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [showResetForm, setShowResetForm] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const { setAuth } = useAuthStore();
   const navigate = useNavigate();
+  const { theme } = useTheme();
+  const colors = getThemeColors(theme);
+
+  const validateForm = () => {
+    const newErrors: typeof errors = {};
+    if (!email) newErrors.email = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) newErrors.email = 'Invalid email format';
+    if (!password) newErrors.password = 'Password is required';
+    else if (password.length < 6) newErrors.password = 'Password must be at least 6 characters';
+    return newErrors;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const newErrors = validateForm();
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
     setLoading(true);
     try {
       const formData = new FormData();
@@ -34,123 +57,270 @@ const LoginPage = () => {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resetEmail)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      await api.post('/auth/forgot-password', { email: resetEmail });
+      toast.success('Password reset link sent to your email!');
+      setResetEmail('');
+      setShowResetForm(false);
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Failed to send reset link');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   return (
     <div style={{
       minHeight: '100vh',
       display: 'flex',
-      background: '#f5f6fa',
+      background: colors.bg.secondary,
       fontFamily: "'DM Sans', sans-serif",
     }}>
-      {/* Left panel */}
+      {/* Left Panel - Branded */}
       <div style={{
-        width: '420px',
-        background: '#0f1623',
+        width: '50%',
+        background: `linear-gradient(135deg, #1F4F78 0%, #20B2AA 100%)`,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        padding: '48px 40px',
+        padding: '60px 48px',
         flexShrink: 0,
-      }}>
+        ...(typeof window !== 'undefined' && window.innerWidth <= 1024 ? { display: 'none' } : {}),
+      } as React.CSSProperties}>
         <div>
-          <div style={{
-            width: '40px', height: '40px', borderRadius: '10px',
-            background: '#0ea5e9', display: 'flex', alignItems: 'center',
-            justifyContent: 'center', marginBottom: '48px',
+          <Logo size="lg" showText variant="vertical" />
+          <h2 style={{
+            margin: '48px 0 20px',
+            fontSize: '32px',
+            fontWeight: '700',
+            color: '#fff',
+            lineHeight: 1.2,
+            letterSpacing: '-0.5px',
           }}>
-            <span style={{ color: '#fff', fontWeight: '800', fontSize: '13px' }}>IMS</span>
-          </div>
-          <h2 style={{ margin: '0 0 16px', fontSize: '28px', fontWeight: '700', color: '#fff', lineHeight: 1.2 }}>
-            Intern Management System
+            Welcome to IMS
           </h2>
-          <p style={{ margin: 0, color: '#64748b', fontSize: '15px', lineHeight: 1.6 }}>
-            Track attendance, logs, tasks, expenses and stipends — all in one place.
+          <p style={{
+            margin: 0,
+            color: 'rgba(255, 255, 255, 0.85)',
+            fontSize: '15px',
+            lineHeight: 1.7,
+            maxWidth: '380px',
+          }}>
+            Manage interns efficiently. Track attendance, work logs, tasks, expenses, and stipends all in one integrated platform.
           </p>
         </div>
-        <div>
-          {['Interns', 'Managers', 'CEO Analytics'].map((role) => (
-            <div key={role} style={{
-              display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px',
+
+        <div style={{
+          display: 'grid',
+          gap: '16px',
+        }}>
+          {[
+            { icon: '👥', title: 'For Interns', desc: 'Log work, submit tasks' },
+            { icon: '📊', title: 'For Managers', desc: 'Review & approve' },
+            { icon: '📈', title: 'For CEO', desc: 'Analytics & insights' },
+          ].map((item, i) => (
+            <div key={i} style={{
+              display: 'flex',
+              gap: '12px',
+              alignItems: 'flex-start',
             }}>
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0ea5e9' }} />
-              <span style={{ color: '#94a3b8', fontSize: '14px' }}>{role}</span>
+              <div style={{ fontSize: '20px', marginTop: '2px' }}>{item.icon}</div>
+              <div>
+                <p style={{
+                  margin: 0,
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  color: '#fff',
+                  letterSpacing: '0.3px',
+                }}>
+                  {item.title}
+                </p>
+                <p style={{
+                  margin: '4px 0 0',
+                  fontSize: '12px',
+                  color: 'rgba(255, 255, 255, 0.7)',
+                }}>
+                  {item.desc}
+                </p>
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Right panel */}
+      {/* Right Panel - Login Form */}
       <div style={{
-        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px',
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '40px 48px',
+        minWidth: 0,
       }}>
-        <div style={{ width: '100%', maxWidth: '400px' }}>
-          <h1 style={{ margin: '0 0 8px', fontSize: '24px', fontWeight: '700', color: '#0f1623' }}>
-            Sign in
-          </h1>
-          <p style={{ margin: '0 0 36px', color: '#64748b', fontSize: '15px' }}>
-            Enter your credentials to continue
-          </p>
+        <div style={{
+          width: '100%',
+          maxWidth: '420px',
+        }}>
+          {/* Mobile Logo */}
+          <div style={{
+            display: 'none',
+            marginBottom: '32px',
+          } as React.CSSProperties}>
+            <Logo size="md" showText />
+          </div>
 
-          <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: '18px' }}>
-              <label style={{ display: 'block', marginBottom: '7px', fontSize: '13px', fontWeight: '600', color: '#374151' }}>
-                Email address
-              </label>
-              <div style={{ position: 'relative' }}>
-                <Mail size={16} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
-                <input
+          {!showResetForm ? (
+            <>
+              <div style={{ marginBottom: '32px' }}>
+                <h1 style={{
+                  margin: 0,
+                  fontSize: '28px',
+                  fontWeight: '800',
+                  background: 'linear-gradient(135deg, #1F4F78 0%, #20B2AA 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  letterSpacing: '-0.5px',
+                }}>
+                  Sign In
+                </h1>
+                <p style={{
+                  margin: '8px 0 0',
+                  color: colors.text.secondary,
+                  fontSize: '14px',
+                }}>
+                  Enter your credentials to access the system
+                </p>
+              </div>
+
+              <form onSubmit={handleSubmit} style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px',
+              }}>
+                <Input
+                  label="Email Address"
                   type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
                   placeholder="you@company.com"
-                  style={{
-                    width: '100%', padding: '11px 14px 11px 40px',
-                    background: '#fff', border: '1px solid #e2e8f0',
-                    borderRadius: '8px', color: '#0f1623', fontSize: '14px',
-                    fontFamily: "'DM Sans', sans-serif", outline: 'none',
-                    boxSizing: 'border-box',
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (errors.email) setErrors({ ...errors, email: undefined });
                   }}
+                  error={errors.email}
                 />
-              </div>
-            </div>
 
-            <div style={{ marginBottom: '28px' }}>
-              <label style={{ display: 'block', marginBottom: '7px', fontSize: '13px', fontWeight: '600', color: '#374151' }}>
-                Password
-              </label>
-              <div style={{ position: 'relative' }}>
-                <Lock size={16} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  placeholder="••••••••"
-                  style={{
-                    width: '100%', padding: '11px 14px 11px 40px',
-                    background: '#fff', border: '1px solid #e2e8f0',
-                    borderRadius: '8px', color: '#0f1623', fontSize: '14px',
-                    fontFamily: "'DM Sans', sans-serif", outline: 'none',
-                    boxSizing: 'border-box',
-                  }}
+                <div>
+                  <Input
+                    label="Password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (errors.password) setErrors({ ...errors, password: undefined });
+                    }}
+                    error={errors.password}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowResetForm(true)}
+                    style={{
+                      marginTop: '8px',
+                      background: 'none',
+                      border: 'none',
+                      color: '#20B2AA',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      padding: 0,
+                      textDecoration: 'underline',
+                      transition: 'color 0.2s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#1F4F78'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = '#20B2AA'}
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+
+                <Button
+                  variant="primary"
+                  fullWidth
+                  type="submit"
+                  loading={loading}
+                >
+                  {loading ? 'Signing in...' : 'Sign In'}
+                </Button>
+              </form>
+            </>
+          ) : (
+            <>
+              <div style={{ marginBottom: '32px' }}>
+                <h1 style={{
+                  margin: 0,
+                  fontSize: '28px',
+                  fontWeight: '800',
+                  background: 'linear-gradient(135deg, #1F4F78 0%, #20B2AA 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  letterSpacing: '-0.5px',
+                }}>
+                  Reset Password
+                </h1>
+                <p style={{
+                  margin: '8px 0 0',
+                  color: colors.text.secondary,
+                  fontSize: '14px',
+                }}>
+                  Enter your email to receive a password reset link
+                </p>
+              </div>
+
+              <form onSubmit={handleForgotPassword} style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px',
+              }}>
+                <Input
+                  label="Email Address"
+                  type="email"
+                  placeholder="you@company.com"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
                 />
-              </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                width: '100%', padding: '13px', background: '#0f1623',
-                border: 'none', borderRadius: '8px', color: '#fff',
-                fontSize: '15px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center',
-                justifyContent: 'center', gap: '8px', fontFamily: "'DM Sans', sans-serif",
-              }}
-            >
-              {loading ? 'Signing in...' : (<>Sign in <ArrowRight size={16} /></>)}
-            </button>
-          </form>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <Button
+                    variant="secondary"
+                    fullWidth
+                    type="button"
+                    onClick={() => {
+                      setShowResetForm(false);
+                      setResetEmail('');
+                    }}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    variant="primary"
+                    fullWidth
+                    type="submit"
+                    loading={resetLoading}
+                  >
+                    {resetLoading ? 'Sending...' : 'Send Reset Link'}
+                  </Button>
+                </div>
+              </form>
+            </>
+          )}
         </div>
       </div>
     </div>

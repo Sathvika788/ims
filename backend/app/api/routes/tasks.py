@@ -9,11 +9,11 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
 class TaskCreateRequest(BaseModel):
-    intern_id: str
+    assigned_to_email: str  # Accept email
     title: str
     description: str
-    due_date: str
-    priority: str  # 'low', 'medium', 'high'
+    due_date: Optional[str] = None
+    priority: str = 'medium'  # 'low', 'medium', 'high'
 
 
 class TaskUpdateRequest(BaseModel):
@@ -37,16 +37,16 @@ async def create_task(
     if request.priority not in ['low', 'medium', 'high']:
         raise HTTPException(status_code=400, detail="Invalid priority")
     
-    # Verify intern exists
-    intern = user_repo.get_user_by_id(request.intern_id)
+    # Verify intern exists by email
+    intern = user_repo.get_user_by_email(request.assigned_to_email)
     if not intern or intern['role'] != 'intern':
         raise HTTPException(status_code=404, detail="Intern not found")
     
     task = task_repo.create_task(
-        intern_id=request.intern_id,
+        assigned_to_email=request.assigned_to_email,
         title=request.title,
         description=request.description,
-        due_date=request.due_date,
+        due_date=request.due_date or None,
         priority=request.priority,
         assigned_by=current_user['user_id']
     )
@@ -54,10 +54,10 @@ async def create_task(
     return task
 
 
-@router.get("/my-tasks")
-async def get_my_tasks(current_user: dict = Depends(get_current_user)):
-    """Get own tasks"""
-    tasks = task_repo.get_tasks_by_intern(current_user['user_id'])
+@router.get("/all")
+async def get_all_tasks(current_user: dict = Depends(require_manager)):
+    """Get all tasks (managers/CEO only)"""
+    tasks = task_repo.get_all_tasks()
     
     # Enrich with assigner info
     enriched_tasks = []
@@ -71,16 +71,33 @@ async def get_my_tasks(current_user: dict = Depends(get_current_user)):
     return enriched_tasks
 
 
-@router.get("/intern/{intern_id}")
+@router.get("/my-tasks")
+async def get_my_tasks(current_user: dict = Depends(get_current_user)):
+    """Get own tasks"""
+    tasks = task_repo.get_tasks_by_email(current_user['email'])
+    
+    # Enrich with assigner info
+    enriched_tasks = []
+    for task in tasks:
+        assigner = user_repo.get_user_by_id(task['assigned_by'])
+        enriched_tasks.append({
+            **task,
+            'assigned_by_name': assigner['name'] if assigner else 'Unknown'
+        })
+    
+    return enriched_tasks
+
+
+@router.get("/intern/{intern_email}")
 async def get_intern_tasks(
-    intern_id: str,
+    intern_email: str,
     current_user: dict = Depends(require_manager)
 ):
     """Get tasks for a specific intern (managers/CEO only)"""
-    tasks = task_repo.get_tasks_by_intern(intern_id)
+    tasks = task_repo.get_tasks_by_email(intern_email)
     
     # Get intern info
-    intern = user_repo.get_user_by_id(intern_id)
+    intern = user_repo.get_user_by_email(intern_email)
     
     # Enrich with assigner info
     enriched_tasks = []
@@ -114,7 +131,7 @@ async def update_task_status(
         raise HTTPException(status_code=404, detail="Task not found")
     
     # Interns can only update their own tasks
-    if current_user['role'] == 'intern' and task['intern_id'] != current_user['user_id']:
+    if current_user['role'] == 'intern' and task['assigned_to_email'] != current_user['email']:
         raise HTTPException(status_code=403, detail="Access forbidden")
     
     success = task_repo.update_task_status(task_id, request.status)

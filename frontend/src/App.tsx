@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import {
   InternDashboard,
   InternLogs,
@@ -12,8 +13,9 @@ import {
   InternLeave,
   InternWFH,
   InternProjects,
-  InternResignation,
+  InternRelieving,
   InternComplaints,
+  InternKT,
 } from './pages/intern/InternPages';
 import ManagerDashboard from './pages/manager/ManagerDashboard';
 import ManagerLogs from './pages/manager/ManagerLogs';
@@ -26,12 +28,14 @@ import {
   ManagerStipends,
   ManagerInterns,
   ManagerAttendance,
-  ManagerResignations,
+  ManagerRelievings,
   ManagerComplaints,
+  ManagerReports,  // ADD
+  ManagerKT,
 } from './pages/manager/ManagerPages';
-import ManagerProjects from './pages/manager/ManagerProjects';
+import ManagerProjects from './pages/manager/Managerprojects';
 import CEODashboard from './pages/ceo/CEODashboard';
-import CEOProjects from './pages/ceo/CEOProjects';
+import CEOProjects from './pages/ceo/Ceoprojects';
 
 function App() {
   const { isAuthenticated, user } = useAuthStore();
@@ -59,6 +63,7 @@ function App() {
       {/* Public routes */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/" element={<RootRedirect />} />
 
       {/* ── Intern routes ── */}
@@ -71,8 +76,16 @@ function App() {
       <Route path="/intern/leave" element={<ProtectedRoute allowedRoles={['intern']}><InternLeave /></ProtectedRoute>} />
       <Route path="/intern/wfh" element={<ProtectedRoute allowedRoles={['intern']}><InternWFH /></ProtectedRoute>} />
       <Route path="/intern/projects" element={<ProtectedRoute allowedRoles={['intern']}><InternProjects /></ProtectedRoute>} />
-      <Route path="/intern/resignation" element={<ProtectedRoute allowedRoles={['intern']}><InternResignation /></ProtectedRoute>} />
+      <Route path="/intern/relieving" element={<ProtectedRoute allowedRoles={['intern']}><InternRelieving /></ProtectedRoute>} />
       <Route path="/intern/complaints" element={<ProtectedRoute allowedRoles={['intern']}><InternComplaints /></ProtectedRoute>} />
+      <Route
+  path="/intern/kt"
+  element={
+    <ProtectedRoute allowedRoles={['intern']}>
+      <InternKT />
+    </ProtectedRoute>
+  }
+/>
 
       {/* ── Manager routes ── */}
       <Route path="/manager" element={<ProtectedRoute allowedRoles={['manager', 'ceo']}><ManagerDashboard /></ProtectedRoute>} />
@@ -86,9 +99,24 @@ function App() {
       <Route path="/manager/interns" element={<ProtectedRoute allowedRoles={['manager', 'ceo']}><ManagerInterns /></ProtectedRoute>} />
       <Route path="/manager/attendance" element={<ProtectedRoute allowedRoles={['manager', 'ceo']}><ManagerAttendance /></ProtectedRoute>} />
       <Route path="/manager/projects" element={<ProtectedRoute allowedRoles={['manager', 'ceo']}><ManagerProjects /></ProtectedRoute>} />
-      <Route path="/manager/resignations" element={<ProtectedRoute allowedRoles={['manager', 'ceo']}><ManagerResignations /></ProtectedRoute>} />
+      <Route path="/manager/relievings" element={<ProtectedRoute allowedRoles={['manager', 'ceo']}><ManagerRelievings /></ProtectedRoute>} />
       <Route path="/manager/complaints" element={<ProtectedRoute allowedRoles={['manager', 'ceo']}><ManagerComplaints /></ProtectedRoute>} />
-
+      <Route
+  path="/manager/reports"
+  element={
+    <ProtectedRoute allowedRoles={['manager', 'ceo']}>
+      <ManagerReports />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/manager/kt"
+  element={
+    <ProtectedRoute allowedRoles={['manager', 'ceo']}>
+      <ManagerKT />
+    </ProtectedRoute>
+  }
+/>
       {/* ── CEO routes ── */}
       <Route path="/ceo" element={<ProtectedRoute allowedRoles={['ceo']}><CEODashboard /></ProtectedRoute>} />
       <Route path="/ceo/projects" element={<ProtectedRoute allowedRoles={['ceo']}><CEOProjects /></ProtectedRoute>} />

@@ -37,13 +37,13 @@ def upload_file(file_content: bytes, filename: str, content_type: str) -> str:
     unique_filename = f"{uuid.uuid4()}{ext}"
     
     try:
-        # Upload to S3 with public-read ACL
+        # Upload to S3 - bucket policy makes files public
         s3_client.put_object(
             Bucket=settings.S3_BUCKET_NAME,
             Key=unique_filename,
             Body=file_content,
-            ContentType=content_type,
-            ACL='public-read'  # THIS MAKES THE FILE PUBLICLY ACCESSIBLE
+            ContentType=content_type
+            # ACL removed - bucket policy handles public access
         )
         
         # Return public URL

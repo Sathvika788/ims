@@ -9,8 +9,9 @@ from app.db.dynamo import stipend_repo
 from app.db.dynamo import leave_repo
 from app.db.dynamo import wfh_repo
 from app.db.dynamo import project_repo
-from app.db.dynamo import resignation_repo  # ADD
+from app.db.dynamo import relieving_repo  # ADD
 from app.db.dynamo import complaint_repo
+from app.db.dynamo import kt_repo
 
 __all__ = [
     'user_repo',
@@ -23,6 +24,7 @@ __all__ = [
     'leave_repo',
     'wfh_repo',
     'project_repo',
-    'resignation_repo',  # ADD
+    'relieving_repo',  # ADD
     'complaint_repo',
+    'kt_repo',
 ]

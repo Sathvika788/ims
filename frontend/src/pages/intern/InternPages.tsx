@@ -926,6 +926,7 @@ export const InternAttendance = () => {
     </PageShell>
   );
 };
-export { default as InternResignation } from './InternResignation';
+export { default as InternRelieving } from './InternRelieving';
 export { default as InternComplaints } from './InternComplaints';
 export { default as InternProjects } from './InternProjects';
+export { default as InternKT } from './InternKT';

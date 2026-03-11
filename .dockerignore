@@ -1,0 +1,54 @@
+# Git
+.git
+.gitignore
+.env.local
+.env.*.local
+
+# Node
+node_modules
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+dist
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info
+.pytest_cache
+.coverage
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+docs
+README.md
+
+# Build files
+*.zip
+*.tar.gz
+
+# Environment
+.env.development
+.env.test
+
+# Other
+.next
+.nuxt
+dist
+coverage

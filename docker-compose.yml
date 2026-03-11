@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  ims-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - AWS_REGION=us-east-1
+      - DATABASE_URL=dynamodb://localhost
+    volumes:
+      # For DynamoDB local development (optional)
+      - dynamodb_data:/data
+    networks:
+      - ims-network
+    restart: unless-stopped
+
+  # Optional: Local DynamoDB for testing
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    ports:
+      - "8001:8000"
+    volumes:
+      - dynamodb_data:/home/dynamodblocal/data
+    working_dir: /home/dynamodblocal
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath /home/dynamodblocal/data"
+    networks:
+      - ims-network
+    restart: unless-stopped
+
+volumes:
+  dynamodb_data:
+
+networks:
+  ims-network:
+    driver: bridge

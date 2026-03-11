@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from app.core.security import get_current_user, require_manager, require_ceo
 from app.db.dynamo import (
     user_repo, log_repo, attendance_repo, task_repo,
-    expense_repo, stipend_repo
+    expense_repo, stipend_repo, leave_repo, wfh_repo
 )
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -19,20 +19,25 @@ async def get_intern_stats(current_user: dict = Depends(get_current_user)):
     
     intern_id = current_user['user_id']
     
+    # Get user info to get email
+    user = user_repo.get_user_by_id(intern_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
     # Get current month
     now = datetime.now()
     current_month = now.strftime('%Y-%m')
     
     # Get logs
-    logs = log_repo.get_logs_by_intern(intern_id, limit=30)
-    pending_logs = len([l for l in logs if l['status'] == 'pending'])
-    verified_logs = len([l for l in logs if l['status'] == 'verified'])
+    logs = log_repo.get_logs_by_intern(intern_id)
+    pending_logs = len([l for l in logs if l.get('status') == 'pending'])
+    verified_logs = len([l for l in logs if l.get('status') == 'verified'])
     
     # Get attendance
     attendance_counts = attendance_repo.count_attendance_by_status(intern_id, current_month)
     
-    # Get tasks
-    tasks = task_repo.get_tasks_by_intern(intern_id)
+    # Get tasks - UPDATED to use email
+    tasks = task_repo.get_tasks_by_email(user['email'])
     pending_tasks = len([t for t in tasks if t['status'] == 'pending'])
     in_progress_tasks = len([t for t in tasks if t['status'] == 'in_progress'])
     completed_tasks = len([t for t in tasks if t['status'] == 'completed'])
@@ -40,7 +45,7 @@ async def get_intern_stats(current_user: dict = Depends(get_current_user)):
     # Get expenses
     expenses = expense_repo.get_expenses_by_intern(intern_id)
     pending_expenses = len([e for e in expenses if e['status'] == 'pending'])
-    approved_expenses_total = sum([e['amount'] for e in expenses if e['status'] == 'approved'])
+    approved_expenses_total = sum([float(e['amount']) for e in expenses if e['status'] == 'approved'])
     
     # Get current month stipend
     stipend = stipend_repo.get_stipend(intern_id, current_month)
@@ -80,25 +85,28 @@ async def get_manager_stats(current_user: dict = Depends(require_manager)):
     
     # Get logs submitted today
     today_logs = log_repo.get_logs_by_date(today)
-    pending_verifications = len([l for l in today_logs if l['status'] == 'pending'])
+    pending_verifications = len([l for l in today_logs if l.get('status') == 'pending'])
     
     # Get all expenses
     expenses = expense_repo.get_all_expenses()
     pending_expenses = len([e for e in expenses if e['status'] == 'pending'])
     
-    # Get all tasks
+    # Get all tasks - UPDATED to use email
     all_tasks = []
     for intern in interns:
-        tasks = task_repo.get_tasks_by_intern(intern['id'])
+        tasks = task_repo.get_tasks_by_email(intern['email'])
         all_tasks.extend(tasks)
     
     overdue_tasks = []
     today_date = datetime.now().date()
     for task in all_tasks:
-        if task['status'] != 'completed':
-            due_date = datetime.fromisoformat(task['due_date']).date()
-            if due_date < today_date:
-                overdue_tasks.append(task)
+        if task['status'] != 'completed' and task.get('due_date'):
+            try:
+                due_date = datetime.fromisoformat(task['due_date']).date()
+                if due_date < today_date:
+                    overdue_tasks.append(task)
+            except:
+                pass
     
     return {
         "total_interns": total_interns,
@@ -127,27 +135,36 @@ async def get_ceo_analytics(current_user: dict = Depends(require_ceo)):
     
     for intern in interns:
         counts = attendance_repo.count_attendance_by_status(intern['id'], current_month)
-        total_present += counts['present']
-        total_late += counts['late']
-        total_absent += counts['absent']
+        total_present += counts.get('present', 0)
+        total_late += counts.get('late', 0)
+        total_absent += counts.get('absent', 0)
     
     # Stipend overview
-    stipends = stipend_repo.get_all_stipends_for_month(current_month)
-    total_stipend = sum([s['total_amount'] for s in stipends])
-    paid_stipends = len([s for s in stipends if s['paid']])
-    unpaid_stipends = len([s for s in stipends if not s['paid']])
+    try:
+        stipends = stipend_repo.get_all_stipends_for_month(current_month)
+    except:
+        # Fallback if function doesn't exist
+        stipends = []
+        for intern in interns:
+            stipend = stipend_repo.get_stipend(intern['id'], current_month)
+            if stipend:
+                stipends.append(stipend)
+    
+    total_stipend = sum([s.get('total_amount', 0) for s in stipends])
+    paid_stipends = len([s for s in stipends if s.get('paid', False)])
+    unpaid_stipends = len([s for s in stipends if not s.get('paid', False)])
     
     # Expense overview
     expenses = expense_repo.get_all_expenses()
     current_month_expenses = [e for e in expenses if e['date'].startswith(current_month)]
     pending_expenses = len([e for e in current_month_expenses if e['status'] == 'pending'])
     approved_expenses = len([e for e in current_month_expenses if e['status'] == 'approved'])
-    total_expense_amount = sum([e['amount'] for e in current_month_expenses if e['status'] == 'approved'])
+    total_expense_amount = sum([float(e['amount']) for e in current_month_expenses if e['status'] == 'approved'])
     
-    # Task completion rate
+    # Task completion rate - UPDATED to use email
     all_tasks = []
     for intern in interns:
-        tasks = task_repo.get_tasks_by_intern(intern['id'])
+        tasks = task_repo.get_tasks_by_email(intern['email'])
         all_tasks.extend(tasks)
     
     completed_tasks = len([t for t in all_tasks if t['status'] == 'completed'])
@@ -157,10 +174,10 @@ async def get_ceo_analytics(current_user: dict = Depends(require_ceo)):
     # Logs verification rate
     all_logs = []
     for intern in interns:
-        logs = log_repo.get_logs_by_intern(intern['id'], limit=100)
+        logs = log_repo.get_logs_by_intern(intern['id'])
         all_logs.extend(logs)
     
-    verified_logs = len([l for l in all_logs if l['status'] == 'verified'])
+    verified_logs = len([l for l in all_logs if l.get('status') == 'verified'])
     total_logs = len(all_logs)
     verification_rate = (verified_logs / total_logs * 100) if total_logs > 0 else 0
     

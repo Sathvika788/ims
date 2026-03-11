@@ -16,7 +16,7 @@ export const ManagerStipends = () => {
   const { data: interns } = useQuery({
     queryKey: ['all-interns'],
     queryFn: async () => {
-      const res = await api.get('/users/interns');
+      const res = await api.get('/auth/users/interns');
       return res.data;
     },
   });
@@ -467,5 +467,7 @@ export const ManagerAttendance = () => {
     </PageShell>
   );
 };
-export { default as ManagerResignations } from './ManagerResignations';
+export { default as ManagerRelievings } from './ManagerRelievings';
 export { default as ManagerComplaints } from './ManagerComplaints';
+export { default as ManagerReports } from './ManagerReports';
+export { default as ManagerKT } from './ManagerKT';

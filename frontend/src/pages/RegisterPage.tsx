@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { useTheme, getThemeColors } from '../context/ThemeContext';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { User, Mail, Lock, ArrowRight, ShieldCheck } from 'lucide-react';
+import Logo from '../components/common/Logo';
+import { Button, Input, Badge } from '../components/common';
 
 const RegisterPage = () => {
   const [searchParams] = useSearchParams();
@@ -13,8 +15,11 @@ const RegisterPage = () => {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string }>({});
   const { setAuth } = useAuthStore();
   const navigate = useNavigate();
+  const { theme } = useTheme();
+  const colors = getThemeColors(theme);
 
   useEffect(() => {
     if (code) {
@@ -24,8 +29,24 @@ const RegisterPage = () => {
     }
   }, [code]);
 
+  const validateForm = () => {
+    const newErrors: typeof errors = {};
+    if (!name) newErrors.name = 'Name is required';
+    if (!email) newErrors.email = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) newErrors.email = 'Invalid email format';
+    if (!password) newErrors.password = 'Password is required';
+    else if (password.length < 6) newErrors.password = 'Password must be at least 6 characters';
+    return newErrors;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const newErrors = validateForm();
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await api.post('/auth/register', { email, password, name, invite_code: code });
@@ -42,69 +63,200 @@ const RegisterPage = () => {
   };
 
   const roleAccent = role === 'intern' ? '#0ea5e9' : role === 'manager' ? '#6366f1' : '#f59e0b';
-  const roleBg = role === 'intern' ? '#e0f2fe' : role === 'manager' ? '#ede9fe' : '#fef3c7';
-
-  const fieldStyle = {
-    width: '100%', padding: '11px 14px 11px 40px',
-    background: '#fff', border: '1px solid #e2e8f0',
-    borderRadius: '8px', color: '#0f1623', fontSize: '14px',
-    fontFamily: "'DM Sans', sans-serif", outline: 'none', boxSizing: 'border-box' as const,
-  };
-  const labelStyle = { display: 'block' as const, marginBottom: '7px', fontSize: '13px', fontWeight: '600' as const, color: '#374151' };
-  const iconStyle = (color = '#94a3b8'): React.CSSProperties => ({ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color });
+  const roleLight =
+    role === 'intern' ? '#e0f2fe'
+    : role === 'manager' ? '#ede9fe'
+    : '#fef3c7';
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f6fa', fontFamily: "'DM Sans', sans-serif" }}>
-      <div style={{ width: '100%', maxWidth: '460px', background: '#fff', borderRadius: '14px', border: '1px solid #e8eaf0', boxShadow: '0 4px 24px rgba(0,0,0,0.06)', padding: '40px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#0f1623', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
-            <span style={{ color: '#fff', fontWeight: '800', fontSize: '13px' }}>IMS</span>
-          </div>
-          <h1 style={{ margin: '0 0 8px', fontSize: '22px', fontWeight: '700', color: '#0f1623' }}>Create your account</h1>
-          <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>Join the Intern Management System</p>
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: colors.bg.secondary,
+      fontFamily: "'DM Sans', sans-serif",
+      padding: '20px',
+    }}>
+      <div style={{
+        width: '100%',
+        maxWidth: '500px',
+        background: colors.card,
+        borderRadius: '20px',
+        border: `1px solid ${colors.border}`,
+        boxShadow: `0 12px 40px ${colors.shadow}`,
+        padding: '48px',
+        animation: 'fadeIn 0.5s ease-in',
+      }}>
+        {/* Logo */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          marginBottom: '32px',
+        }}>
+          <Logo size="md" showText />
         </div>
 
+        {/* Header */}
+        <div style={{
+          textAlign: 'center',
+          marginBottom: '32px',
+        }}>
+          <h1 style={{
+            margin: 0,
+            fontSize: '26px',
+            fontWeight: '800',
+            background: 'linear-gradient(135deg, #1F4F78 0%, #20B2AA 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            letterSpacing: '-0.5px',
+          }}>
+            Create Account
+          </h1>
+          <p style={{
+            margin: '8px 0 0',
+            color: colors.text.secondary,
+            fontSize: '14px',
+          }}>
+            Join the Intern Management System
+          </p>
+        </div>
+
+        {/* Role Badge */}
         {role && (
-          <div style={{ marginBottom: '24px', padding: '12px 16px', background: roleBg, borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <ShieldCheck size={18} color={roleAccent} />
+          <div style={{
+            marginBottom: '24px',
+            padding: '14px 16px',
+            background: roleLight,
+            borderRadius: '12px',
+            border: `1px solid ${roleAccent}30`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
             <div>
-              <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>You're registering as</p>
-              <p style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: roleAccent, textTransform: 'capitalize' }}>{role}</p>
+              <p style={{
+                margin: 0,
+                fontSize: '12px',
+                color: colors.text.secondary,
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                fontWeight: '600',
+              }}>
+                Registration Role
+              </p>
+              <p style={{
+                margin: '4px 0 0',
+                fontSize: '15px',
+                fontWeight: '700',
+                color: roleAccent,
+                textTransform: 'capitalize',
+              }}>
+                {role}
+              </p>
             </div>
+            <Badge variant={
+              role === 'intern' ? 'info'
+              : role === 'manager' ? 'primary'
+              : 'warning'
+            }>
+              ✓ Verified
+            </Badge>
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
-          {[
-            { label: 'Full Name', value: name, onChange: setName, type: 'text', placeholder: 'John Doe', Icon: User },
-            { label: 'Email Address', value: email, onChange: setEmail, type: 'email', placeholder: 'you@company.com', Icon: Mail },
-            { label: 'Password', value: password, onChange: setPassword, type: 'password', placeholder: '••••••••', Icon: Lock },
-          ].map(({ label, value, onChange, type, placeholder, Icon }) => (
-            <div key={label} style={{ marginBottom: '18px' }}>
-              <label style={labelStyle}>{label}</label>
-              <div style={{ position: 'relative' }}>
-                <Icon size={16} style={iconStyle()} />
-                <input type={type} value={value} onChange={(e) => onChange(e.target.value)} required placeholder={placeholder} style={fieldStyle} />
-              </div>
-            </div>
-          ))}
-
-          <button
-            type="submit"
-            disabled={loading || !role}
-            style={{
-              width: '100%', padding: '13px', background: roleAccent || '#0f1623',
-              border: 'none', borderRadius: '8px', color: '#fff',
-              fontSize: '15px', fontWeight: '600', cursor: loading || !role ? 'not-allowed' : 'pointer',
-              opacity: loading || !role ? 0.7 : 1,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-              fontFamily: "'DM Sans', sans-serif",
+        {/* Form */}
+        <form onSubmit={handleSubmit} style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '18px',
+        }}>
+          <Input
+            label="Full Name"
+            type="text"
+            placeholder="John Doe"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (errors.name) setErrors({ ...errors, name: undefined });
             }}
-          >
-            {loading ? 'Creating account...' : (<>Create Account <ArrowRight size={16} /></>)}
-          </button>
+            error={errors.name}
+          />
+
+          <Input
+            label="Email Address"
+            type="email"
+            placeholder="you@company.com"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (errors.email) setErrors({ ...errors, email: undefined });
+            }}
+            error={errors.email}
+          />
+
+          <Input
+            label="Password"
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (errors.password) setErrors({ ...errors, password: undefined });
+            }}
+            error={errors.password}
+          />
+
+          <div style={{ marginTop: '8px' }}>
+            <Button
+              variant="primary"
+              fullWidth
+              type="submit"
+              loading={loading}
+              disabled={!role}
+            >
+              {loading ? 'Creating account...' : 'Create Account'}
+            </Button>
+          </div>
         </form>
+
+        {/* Login Link */}
+        <div style={{
+          marginTop: '28px',
+          paddingTop: '24px',
+          borderTop: `1px solid ${colors.border}`,
+          textAlign: 'center',
+        }}>
+          <p style={{
+            margin: 0,
+            fontSize: '13px',
+            color: colors.text.secondary,
+          }}>
+            Already have an account?{' '}
+            <Link to="/login" style={{
+              color: '#20B2AA',
+              fontWeight: '600',
+              textDecoration: 'none',
+              transition: 'color 0.2s',
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = '#1F4F78'}
+            onMouseLeave={(e) => e.currentTarget.style.color = '#20B2AA'}
+            >
+              Sign in
+            </Link>
+          </p>
+        </div>
       </div>
+
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @media (max-width: 768px) {
+          div { padding: 24px; }
+        }
+      `}</style>
     </div>
   );
 };

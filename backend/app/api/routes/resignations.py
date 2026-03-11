@@ -136,3 +136,89 @@ async def review_resignation(
             print(f"Failed to send resignation review email: {e}")
     
     return {"success": True, "message": f"Resignation {request.status}"}
+
+@router.post("/{resignation_id}/review")
+async def review_resignation(
+    resignation_id: str,
+    request: ResignationReviewRequest,
+    current_user: dict = Depends(require_manager)
+):
+    """Review resignation (managers/CEO only)"""
+    
+    if request.status not in ['accepted', 'rejected']:
+        raise HTTPException(status_code=400, detail="Status must be 'accepted' or 'rejected'")
+    
+    resignation = resignation_repo.get_resignation(resignation_id)
+    if not resignation:
+        raise HTTPException(status_code=404, detail="Resignation not found")
+    
+    success = resignation_repo.update_resignation_status(
+        resignation_id=resignation_id,
+        status=request.status,
+        reviewed_by=current_user['user_id'],
+        review_notes=request.review_notes
+    )
+    
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to update resignation")
+    
+    # DELETE INTERN CREDENTIALS IF ACCEPTED
+    if request.status == 'accepted':
+        intern = user_repo.get_user_by_id(resignation['intern_id'])
+        if intern:
+            # Delete user
+            user_deleted = user_repo.delete_user(resignation['intern_id'])
+            
+            if user_deleted:
+                print(f"[RESIGNATION] Deleted user credentials for {intern['email']}")
+                
+                # Send final email before deletion
+                from app.services.email_service import send_email
+                
+                subject = "Resignation Accepted - Account Deactivated"
+                body = f"""
+                <h2>Resignation Accepted</h2>
+                <p>Hi {intern['name']},</p>
+                <p>Your resignation has been accepted by management.</p>
+                
+                <h3>Last Working Day:</h3>
+                <p>{resignation['last_working_day']}</p>
+                
+                {f'<p><strong>Management Notes:</strong> {request.review_notes}</p>' if request.review_notes else ''}
+                
+                <p><strong>Important:</strong> Your account has been deactivated. You will no longer have access to the IMS system.</p>
+                
+                <p>We wish you all the best in your future endeavors!</p>
+                
+                <p>Best regards,<br>IMS Team</p>
+                """
+                
+                try:
+                    send_email(intern['email'], subject, body)
+                except Exception as e:
+                    print(f"Failed to send resignation acceptance email: {e}")
+    else:
+        # Send rejection email
+        intern = user_repo.get_user_by_id(resignation['intern_id'])
+        if intern:
+            from app.services.email_service import send_email
+            
+            subject = "Resignation Not Accepted"
+            body = f"""
+            <h2>Resignation Not Accepted</h2>
+            <p>Hi {intern['name']},</p>
+            <p>After careful consideration, your resignation has not been accepted at this time.</p>
+            
+            {f'<p><strong>Reason:</strong> {request.review_notes}</p>' if request.review_notes else ''}
+            
+            <p>Please schedule a meeting with your manager to discuss this further.</p>
+            
+            <p>Best regards,<br>IMS Team</p>
+            """
+            
+            try:
+                send_email(intern['email'], subject, body)
+            except Exception as e:
+                print(f"Failed to send resignation rejection email: {e}")
+    
+    return {"success": True, "message": f"Resignation {request.status}"}
